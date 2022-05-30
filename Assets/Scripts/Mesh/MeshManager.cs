@@ -14,8 +14,14 @@ public class MeshManager : MonoBehaviour
 {
     public static MeshManager instance;
 
-    public List<GameMesh> gameMeshes;
-    public int currentMesh;
+    [SerializeField] private List<GameMesh> _gameMeshes;
+    public IReadOnlyList<GameMesh> GameMeshes => _gameMeshes;
+
+    [SerializeField] private int _currentMeshIndex;
+    public int CurrentMeshIndex => _currentMeshIndex;
+
+    [SerializeField] private int _maxTries;
+    public int MaxTries => _maxTries;
 
     [SerializeField] private GameObject _horizontal;
     public GameObject Horizontal => _horizontal;
@@ -23,7 +29,13 @@ public class MeshManager : MonoBehaviour
     [SerializeField] private GameObject _vertical;
     public GameObject Vertical => _vertical;
 
-    Direction currentDirection;
+    [SerializeField] private Sprite _slot;
+    public Sprite Slot => _slot;
+
+    [SerializeField] private Sprite _emptySlot;
+    public Sprite EmptySlot => _emptySlot;
+
+    private Direction currentDirection;
 
     public void Awake()
     {
@@ -33,15 +45,46 @@ public class MeshManager : MonoBehaviour
             Destroy(gameObject);
     }
 
+    private void OnEnable()
+    {
+        Invoke(nameof(SettleNumOfTriesCallback), 0.5f);
+    }
+
+    private void OnDisable()
+    {
+        GameMesh.OnNumOfTriesDecremented -= MeshUIManager.instance.HandleNumOfTriesDecremented;
+        GameMesh.OnNumOfTriesDecremented -= EndMatchVerification;
+    }
+
+    private void SettleNumOfTriesCallback()
+    {
+        GameMesh.OnNumOfTriesDecremented += MeshUIManager.instance.HandleNumOfTriesDecremented;
+        GameMesh.OnNumOfTriesDecremented += EndMatchVerification;
+    }
+
+    private void EndMatchVerification(int delta)
+    {
+        if (GetActiveGameMesh().RemainingTries == 0)
+            print("Game over");
+    }
+
     public void MoveOnMesh(int directionInt)
     {
         currentDirection = (Direction)directionInt;
-        if (gameMeshes[currentMesh].CanStep(currentDirection))
-        {
-            print("MOVE!");
-            gameMeshes[currentMesh].MoveStep(currentDirection);
-        }
+        if (GameMeshes[CurrentMeshIndex].CanStep(currentDirection))
+            GameMeshes[CurrentMeshIndex].MoveStep(currentDirection);
         else
-            print("ERROR!");
+            Debug.LogWarning("Can't move there!");
+    }
+
+    public GameMesh GetActiveGameMesh()
+    {
+        return GameMeshes[CurrentMeshIndex];
+    }
+
+    public void ResetMatch()
+    {
+        GetActiveGameMesh().ResetGameMesh();
+        MeshUIManager.instance.ResetSlots();
     }
 }

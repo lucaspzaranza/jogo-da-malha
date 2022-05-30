@@ -9,15 +9,44 @@ public class GameMesh : MonoBehaviour
 
     [SerializeField] private int _rows;
     [SerializeField] private int _columns;
+    
     [SerializeField] private Vector2Int currentDotPos;
+    [SerializeField] private Vector2Int goalDotPos;
 
-    public List<Dot> dots;
     public float horLinePos;
     public float verLinePos;
+
     private Dot[,] dotsMatrix;
+    private Vector2Int initDotPos;
+
+    [SerializeField] private List<Dot> _dots;
+    public IReadOnlyList<Dot> Dots => _dots;
+
+    private int _remainingTries;
+    public int RemainingTries
+    {
+        get => _remainingTries;
+        private set
+        {
+            if(value > -1 && value < 11)
+            {
+                int delta = _remainingTries - value;
+                _remainingTries = Mathf.Clamp(value, 0, MeshManager.instance.MaxTries);
+                OnNumOfTriesDecremented(delta);
+            }
+        }
+    }
+
+    public delegate void NumOfTriesDecremented(int delta);
+    public static event NumOfTriesDecremented OnNumOfTriesDecremented;
+
+    public delegate void GameMeshReset();
+    public static event GameMeshReset OnGameMeshReset;
 
     void Start()
     {
+        _remainingTries = MeshManager.instance.MaxTries;
+        initDotPos = currentDotPos;
         ArrayToMatrix();
     }
 
@@ -26,15 +55,21 @@ public class GameMesh : MonoBehaviour
         dotsMatrix = new Dot[_rows, _columns];
         int row = 0;
 
-        for (int i = 0; i < dots.Count; i++)
+        for (int i = 0; i < _dots.Count; i++)
         {
             int index = i % _columns;
             if (i > 0 && index == 0)
                 row++;
 
-            dotsMatrix[row, index] = dots[i];
-            //print($"[{row}, {index}]");
+            dotsMatrix[row, index] = _dots[i];
         }
+    }
+
+    public void ResetGameMesh()
+    {
+        _remainingTries = MeshManager.instance.MaxTries;
+        currentDotPos = initDotPos;
+        OnGameMeshReset?.Invoke();
     }
 
     public bool HasLine(Direction direction)
@@ -147,6 +182,15 @@ public class GameMesh : MonoBehaviour
                 line.transform.localPosition = new Vector3(0f, pos.y, 0f);
             else
                 line.transform.localPosition = new Vector3(pos.x, 0f, 0f);
+
+            RemainingTries--;
+            GoalPointReachedVerification();
         }
+    }
+
+    private void GoalPointReachedVerification()
+    {
+        if (currentDotPos == goalDotPos)
+            print("CHEGOU, CARAIO!");
     }
 }
