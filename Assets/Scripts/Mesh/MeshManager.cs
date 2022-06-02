@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public enum Direction
 {
@@ -13,6 +14,9 @@ public enum Direction
 public class MeshManager : MonoBehaviour
 {
     public static MeshManager instance;
+
+    [SerializeField] private bool _limitedTries;
+    public bool LimitedTries => _limitedTries;
 
     [SerializeField] private List<GameMesh> _gameMeshes;
     public IReadOnlyList<GameMesh> GameMeshes => _gameMeshes;
@@ -35,6 +39,9 @@ public class MeshManager : MonoBehaviour
     [SerializeField] private Sprite _emptySlot;
     public Sprite EmptySlot => _emptySlot;
 
+    [SerializeField] private List<AudioClip> _directionAudios;
+    public IReadOnlyList<AudioClip> DirectionAudios => _directionAudios;
+
     private Direction currentDirection;
 
     public void Awake()
@@ -47,34 +54,50 @@ public class MeshManager : MonoBehaviour
 
     private void OnEnable()
     {
-        Invoke(nameof(SettleNumOfTriesCallback), 0.5f);
+        Invoke(nameof(SettleNumOfTriesCallback), 0.1f);
     }
 
     private void OnDisable()
     {
         GameMesh.OnNumOfTriesDecremented -= MeshUIManager.instance.HandleNumOfTriesDecremented;
-        GameMesh.OnNumOfTriesDecremented -= EndMatchVerification;
+        GameMesh.OnNumOfTriesDecremented -= GameOverVerification;
     }
 
     private void SettleNumOfTriesCallback()
     {
         GameMesh.OnNumOfTriesDecremented += MeshUIManager.instance.HandleNumOfTriesDecremented;
-        GameMesh.OnNumOfTriesDecremented += EndMatchVerification;
+        GameMesh.OnNumOfTriesDecremented += GameOverVerification;
     }
 
-    private void EndMatchVerification(int delta)
+    public void IncrementMeshIndex()
     {
-        if (GetActiveGameMesh().RemainingTries == 0)
-            print("Game over");
+        _currentMeshIndex++;
+    }
+
+    private void GameOverVerification(int delta)
+    {
+        var gameMesh = GetActiveGameMesh();
+
+        if (!gameMesh.ReachedGoal && gameMesh.RemainingTries == 0)
+        {
+            MeshUIManager.instance.SetDPadButtonsInteractable(false);
+            StartCoroutine(MeshUIManager.instance.SetGameOverScreenActivation(true, 2f));
+        }
     }
 
     public void MoveOnMesh(int directionInt)
     {
-        currentDirection = (Direction)directionInt;
-        if (GameMeshes[CurrentMeshIndex].CanStep(currentDirection))
-            GameMeshes[CurrentMeshIndex].MoveStep(currentDirection);
-        else
-            Debug.LogWarning("Can't move there!");
+        if(!LimitedTries || (LimitedTries && GetActiveGameMesh().RemainingTries > 0))
+        {
+                        currentDirection = (Direction)directionInt;
+            if (GameMeshes[CurrentMeshIndex].CanStep(currentDirection))
+            {
+                GameMeshes[CurrentMeshIndex].MoveStep(currentDirection);
+                AudioManager.instance.PlayAudio(DirectionAudios[(int)currentDirection]);
+            }
+            else
+                Debug.LogWarning("Can't move there!");
+        }
     }
 
     public GameMesh GetActiveGameMesh()
@@ -86,5 +109,10 @@ public class MeshManager : MonoBehaviour
     {
         GetActiveGameMesh().ResetGameMesh();
         MeshUIManager.instance.ResetSlots();
+    }
+
+    public void RestartGame()
+    {
+        SceneManager.LoadScene(0);
     }
 }

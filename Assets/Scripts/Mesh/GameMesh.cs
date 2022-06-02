@@ -1,14 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class GameMesh : MonoBehaviour
 {
-    [SerializeField] int _minSteps;
-    public int MinSteps => _minSteps;
-
     [SerializeField] private int _rows;
     [SerializeField] private int _columns;
+    [SerializeField] private bool _resizeLine;
+    [Tooltip("Only used if the Resize Line box is checked.")]
+    [SerializeField] private float _lineWidth;
     
     [SerializeField] private Vector2Int currentDotPos;
     [SerializeField] private Vector2Int goalDotPos;
@@ -22,6 +23,9 @@ public class GameMesh : MonoBehaviour
     [SerializeField] private List<Dot> _dots;
     public IReadOnlyList<Dot> Dots => _dots;
 
+    [SerializeField] private bool _reachedGoal;
+    public bool ReachedGoal => _reachedGoal;
+
     private int _remainingTries;
     public int RemainingTries
     {
@@ -32,13 +36,19 @@ public class GameMesh : MonoBehaviour
             {
                 int delta = _remainingTries - value;
                 _remainingTries = Mathf.Clamp(value, 0, MeshManager.instance.MaxTries);
-                OnNumOfTriesDecremented(delta);
+                OnNumOfTriesDecremented?.Invoke(delta);
             }
         }
     }
 
+    [SerializeField] private List<Button> _dPadButtons;
+    public IReadOnlyList<Button> DPadButtons => _dPadButtons;
+
     public delegate void NumOfTriesDecremented(int delta);
     public static event NumOfTriesDecremented OnNumOfTriesDecremented;
+
+    public delegate void EndGame(int remainingTries);
+    public static event EndGame OnEndGame;
 
     public delegate void GameMeshReset();
     public static event GameMeshReset OnGameMeshReset;
@@ -126,7 +136,6 @@ public class GameMesh : MonoBehaviour
         {
             if(dirInt == 0) // Up
             {
-                //line = Instantiate(MeshManager.instance.LineUp);
                 line = Instantiate(MeshManager.instance.Vertical,
                     new Vector2(dotsMatrix[x, y].transform.position.x, verLinePos),
                     MeshManager.instance.Vertical.transform.rotation);
@@ -137,7 +146,6 @@ public class GameMesh : MonoBehaviour
             }
             else // Down
             {
-                //line = Instantiate(MeshManager.instance.LineDown);
                 line = Instantiate(MeshManager.instance.Vertical, 
                     new Vector2(dotsMatrix[x, y].transform.position.x, -verLinePos), 
                     MeshManager.instance.Vertical.transform.rotation);
@@ -151,7 +159,6 @@ public class GameMesh : MonoBehaviour
         {
             if (dirInt == 2) // Left
             {
-                //line = Instantiate(MeshManager.instance.LineLeft);
                 line = Instantiate(MeshManager.instance.Horizontal,
                     new Vector2(-horLinePos, dotsMatrix[x, y].transform.position.y),
                     MeshManager.instance.Horizontal.transform.rotation);
@@ -162,7 +169,6 @@ public class GameMesh : MonoBehaviour
             }
             else // Right
             {
-                //line = Instantiate(MeshManager.instance.LineRight);
                 line = Instantiate(MeshManager.instance.Horizontal,
                     new Vector2(horLinePos, dotsMatrix[x, y].transform.position.y),
                     MeshManager.instance.Horizontal.transform.rotation);
@@ -178,19 +184,29 @@ public class GameMesh : MonoBehaviour
             line.transform.SetParent(dotsMatrix[x, y].transform, false);
             Vector2 pos = line.transform.localPosition;
 
+            if(_resizeLine)
+            {
+                var lineTransform = line.GetComponent<RectTransform>();
+                lineTransform.sizeDelta = new Vector2(_lineWidth, lineTransform.sizeDelta.y);
+            }
+
             if(dirInt < 2)
                 line.transform.localPosition = new Vector3(0f, pos.y, 0f);
             else
                 line.transform.localPosition = new Vector3(pos.x, 0f, 0f);
 
-            RemainingTries--;
             GoalPointReachedVerification();
         }
     }
 
     private void GoalPointReachedVerification()
     {
-        if (currentDotPos == goalDotPos)
-            print("CHEGOU, CARAIO!");
+        _reachedGoal = currentDotPos == goalDotPos;
+
+        if (MeshManager.instance.LimitedTries)
+            RemainingTries--;
+
+        if (_reachedGoal)
+            OnEndGame?.Invoke(MeshManager.instance.MaxTries - RemainingTries);
     }
 }

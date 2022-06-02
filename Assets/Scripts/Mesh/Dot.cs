@@ -14,7 +14,7 @@ public class Dot : MonoBehaviour
 
     private void OnEnable()
     {
-        Invoke(nameof(SetOnGameMeshResetHandler), 0.5f);
+        Invoke(nameof(SetOnGameMeshResetHandler), 0.1f);
     }
 
     private void OnDisable()
@@ -37,11 +37,15 @@ public class Dot : MonoBehaviour
         if (transform.childCount > 0)
             transform.GetChild(0).gameObject.SetActive(false);
 
-        // Se > 1, tem uma linha como child do ponto
+        // Se > 1, tem uma ou mais linhas como child do ponto
         if (transform.childCount > 1)
         {
-            var line = transform.GetChild(1).gameObject;
-            Destroy(line);
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                var child = transform.GetChild(i).gameObject;
+                if (child.activeSelf)
+                    Destroy(child);
+            }
         }
     }
 }
